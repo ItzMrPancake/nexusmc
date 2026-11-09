@@ -17,14 +17,14 @@ import { ServerConfig } from './types';
 const DEFAULT_CONFIG: ServerConfig = {
   serverName: 'NexusMC',
   tagline: 'The Premier Blue-Tea Enchanted Minecraft Network',
-  serverIp: 'play.nexusmc.net',
-  bedrockPort: 19132,
-  javaPort: 25565,
+  serverIp: 'nexusmc.ultramc.co',
+  bedrockPort: 22924,
+  javaPort: 22924,
   version: 'Java & Bedrock 1.20 - 1.21.x',
   webstoreUrl: 'https://store.nexusmc.net',
-  discordUrl: 'https://discord.gg/nexusmc',
-  simulatedPlayers: 312,
-  maxPlayers: 600,
+  discordUrl: 'https://discord.gg/HFJYHcsvJy',
+  simulatedPlayers: 0,
+  maxPlayers: 20,
   pingMs: 19,
 };
 

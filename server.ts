@@ -9,7 +9,21 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-const OWNER_PASSWORD = process.env.OWNER_PASSWORD || '241816';
+// Encrypted SHA-256 hash of owner password embedded in code (no external database required)
+const ENCRYPTED_OWNER_HASH = '44dc9c103da1ca79d903af1f578da230fa53a10efffaca3bcfd9c9b43b39f38a';
+
+function verifyOwnerPassword(password: string): boolean {
+  if (!password || typeof password !== 'string') return false;
+  const hash = crypto.createHash('sha256').update(password).digest('hex');
+  const safeExpected = Buffer.from(ENCRYPTED_OWNER_HASH);
+  const safeGiven = Buffer.from(hash);
+  if (safeGiven.length !== safeExpected.length) return false;
+  try {
+    return crypto.timingSafeEqual(safeGiven, safeExpected);
+  } catch {
+    return false;
+  }
+}
 
 // Body parsers with payload limits
 app.use(express.json({ limit: '10mb' }));
@@ -47,14 +61,14 @@ const CONFIG_FILE = path.resolve(DATA_DIR, 'config.json');
 const INITIAL_CONFIG = {
   serverName: 'NexusMC',
   tagline: 'The Premier Blue-Tea Enchanted Minecraft Network',
-  serverIp: 'play.nexusmc.net',
-  bedrockPort: 19132,
-  javaPort: 25565,
+  serverIp: 'nexusmc.ultramc.co',
+  bedrockPort: 22924,
+  javaPort: 22924,
   version: 'Java & Bedrock 1.20 - 1.21.x',
   webstoreUrl: 'https://store.nexusmc.net',
-  discordUrl: 'https://discord.gg/nexusmc',
-  simulatedPlayers: 312,
-  maxPlayers: 600,
+  discordUrl: 'https://discord.gg/HFJYHcsvJy',
+  simulatedPlayers: 0,
+  maxPlayers: 20,
   pingMs: 19,
 };
 
@@ -303,17 +317,9 @@ function requireAdminAuth(req: Request, res: Response, next: NextFunction): void
     }
   }
 
-  // Fallback: direct password header with constant-time check
-  if (typeof directPassword === 'string') {
-    try {
-      const pwdBuffer = Buffer.from(directPassword);
-      const expectedBuffer = Buffer.from(OWNER_PASSWORD);
-      if (pwdBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(pwdBuffer, expectedBuffer)) {
-        return next();
-      }
-    } catch {
-      // ignore timing error
-    }
+  // Fallback: direct password header with encrypted hash verification
+  if (typeof directPassword === 'string' && verifyOwnerPassword(directPassword)) {
+    return next();
   }
 
   res.status(401).json({
@@ -342,17 +348,7 @@ app.post('/api/admin/login', (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Password required' });
   }
 
-  const safeExpected = Buffer.from(OWNER_PASSWORD);
-  const safeGiven = Buffer.from(password);
-
-  let isMatch = false;
-  if (safeGiven.length === safeExpected.length) {
-    try {
-      isMatch = crypto.timingSafeEqual(safeGiven, safeExpected);
-    } catch {
-      isMatch = false;
-    }
-  }
+  const isMatch = verifyOwnerPassword(password);
 
   if (!isMatch) {
     attempt.count += 1;
@@ -410,6 +406,66 @@ app.put('/api/config', requireAdminAuth, (req: Request, res: Response) => {
   const updated = { ...config, ...req.body };
   saveJson(CONFIG_FILE, updated);
   res.json({ success: true, config: updated });
+});
+
+// Live Minecraft Server Scanner Cache
+let liveStatusCache: any = null;
+let liveStatusCacheTime = 0;
+
+app.get('/api/minecraft/status', async (req: Request, res: Response) => {
+  const ip = (req.query.ip as string) || 'nexusmc.ultramc.co';
+  const now = Date.now();
+
+  // Return cached result if less than 15 seconds old
+  if (liveStatusCache && now - liveStatusCacheTime < 15000 && liveStatusCache.ip === ip) {
+    return res.json(liveStatusCache);
+  }
+
+  try {
+    const apiRes = await fetch(`https://api.mcsrvstat.us/3/${encodeURIComponent(ip)}`, {
+      signal: AbortSignal.timeout(4000),
+    });
+
+    if (apiRes.ok) {
+      const data: any = await apiRes.json();
+      liveStatusCache = {
+        online: Boolean(data.online),
+        ip,
+        port: data.port || 22924,
+        players: {
+          online: Number(data.players?.online ?? 0),
+          max: Number(data.players?.max ?? 20),
+          list: data.players?.list || [],
+        },
+        version: data.version || 'Paper 1.21+',
+        motd: data.motd?.clean || ['NEXUSMC [1.21+] | RPG ISLAND + CUSTOM DUNGEONS'],
+        software: data.software || 'Paper',
+        icon: data.icon || null,
+        scannedAt: now,
+      };
+      liveStatusCacheTime = now;
+      return res.json(liveStatusCache);
+    }
+  } catch (err) {
+    console.warn('Backend Minecraft ping error:', err);
+  }
+
+  // If live query failed but we have a stale cache, return it
+  if (liveStatusCache) {
+    return res.json(liveStatusCache);
+  }
+
+  // Fallback initial response
+  return res.json({
+    online: true,
+    ip,
+    port: 22924,
+    players: { online: 0, max: 20 },
+    version: 'Paper 1.21+',
+    motd: ['NEXUSMC [1.21+] | RPG ISLAND + CUSTOM DUNGEONS'],
+    software: 'Paper',
+    scannedAt: now,
+  });
 });
 
 // 3. Blog Endpoints

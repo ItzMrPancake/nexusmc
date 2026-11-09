@@ -1,0 +1,13 @@
+{
+  "serverName": "NexusMC",
+  "tagline": "The Premier Blue-Tea Enchanted Minecraft Network",
+  "serverIp": "nexusmc.ultramc.co",
+  "bedrockPort": 22924,
+  "javaPort": 22924,
+  "version": "Java & Bedrock 1.20 - 1.21.x",
+  "webstoreUrl": "https://store.nexusmc.net",
+  "discordUrl": "https://discord.gg/HFJYHcsvJy",
+  "simulatedPlayers": 0,
+  "maxPlayers": 20,
+  "pingMs": 19
+}
