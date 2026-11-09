@@ -3,6 +3,7 @@ import { StaffMember } from '../types';
 import { useAdminAuth } from '../context/AdminAuthContext';
 import { extractHeadFromSkin, getMinecraftAvatarUrl } from '../utils/minecraftSkin';
 import { ShieldCheck, Upload, UserPlus, Edit3, Trash2, Check, AlertCircle, MessageSquare, Sparkles } from 'lucide-react';
+import { getStaff, addStaff, updateStaff, deleteStaff } from '../utils/storage';
 
 interface StaffSectionProps {
   onOpenOwnerLogin: (hint?: string) => void;
@@ -37,13 +38,10 @@ export const StaffSection: React.FC<StaffSectionProps> = ({ onOpenOwnerLogin }) 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchStaff = async () => {
+  const fetchStaff = () => {
     try {
-      const res = await fetch('/api/staff');
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setStaffList(data);
-      }
+      const data = getStaff();
+      setStaffList(data);
     } catch (err) {
       console.error('Failed to load staff list:', err);
     }
@@ -112,26 +110,6 @@ export const StaffSection: React.FC<StaffSectionProps> = ({ onOpenOwnerLogin }) 
         setExtractedHeadUrl(headDataUrl);
         setAvatarUrl(headDataUrl);
         setUploadStatus('Custom skin head extracted!');
-
-        if (isAdmin) {
-          try {
-            const uploadRes = await fetch('/api/staff/upload-skin', {
-              method: 'POST',
-              headers: authHeaders,
-              body: JSON.stringify({
-                base64Data: headDataUrl,
-                filename: file.name,
-              }),
-            });
-            const uploadData = await uploadRes.json();
-            if (uploadRes.ok && uploadData.fileUrl) {
-              setAvatarUrl(uploadData.fileUrl);
-              setUploadStatus('Custom skin saved to server!');
-            }
-          } catch (uploadErr) {
-            console.error('Failed to upload head to server:', uploadErr);
-          }
-        }
       } catch (extractErr) {
         setFormError('Failed to parse skin head. Make sure this is a standard Minecraft skin file.');
       } finally {
@@ -159,7 +137,7 @@ export const StaffSection: React.FC<StaffSectionProps> = ({ onOpenOwnerLogin }) 
     }
   };
 
-  const handleSaveStaff = async (e: React.FormEvent) => {
+  const handleSaveStaff = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !role.trim()) {
       setFormError('Name and role are required');
@@ -184,32 +162,22 @@ export const StaffSection: React.FC<StaffSectionProps> = ({ onOpenOwnerLogin }) 
     };
 
     try {
-      let res;
       if (isEditing && editingId) {
-        res = await fetch(`/api/staff/${editingId}`, {
-          method: 'PUT',
-          headers: authHeaders,
-          body: JSON.stringify(payload),
-        });
+        updateStaff(editingId, payload);
+        setFormSuccess('Staff member updated!');
       } else {
-        res = await fetch('/api/staff', {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify(payload),
+        addStaff({
+          ...payload,
+          joined: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
         });
+        setFormSuccess('New staff member added!');
       }
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setFormSuccess(isEditing ? 'Staff member updated!' : 'New staff member added!');
-        resetForm();
-        fetchStaff();
-        setTimeout(() => setFormSuccess(null), 3000);
-      } else {
-        setFormError(data.error || 'Failed to save staff member.');
-      }
+      resetForm();
+      fetchStaff();
+      setTimeout(() => setFormSuccess(null), 3000);
     } catch (err) {
-      setFormError('Network error connecting to backend');
+      setFormError('Failed to save staff member.');
     }
   };
 
@@ -232,19 +200,12 @@ export const StaffSection: React.FC<StaffSectionProps> = ({ onOpenOwnerLogin }) 
     });
   };
 
-  const handleDeleteStaff = async (id: string) => {
+  const handleDeleteStaff = (id: string) => {
     if (!confirm('Are you sure you want to remove this staff member?')) return;
 
     try {
-      const res = await fetch(`/api/staff/${id}`, {
-        method: 'DELETE',
-        headers: authHeaders,
-      });
-      if (res.ok) {
-        fetchStaff();
-      } else {
-        alert('Failed to delete staff member.');
-      }
+      deleteStaff(id);
+      fetchStaff();
     } catch (err) {
       alert('Error deleting staff member');
     }

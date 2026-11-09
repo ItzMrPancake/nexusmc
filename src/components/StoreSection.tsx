@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { StoreItem, ServerConfig } from '../types';
 import { useAdminAuth } from '../context/AdminAuthContext';
-import { ShoppingBag, ExternalLink, Crown, Shield, Star, Key, Zap, Check, Edit3, Trash2, X, Settings2, Sparkles } from 'lucide-react';
+import { ShoppingBag, ExternalLink, Crown, Shield, Star, Key, Zap, Check, Edit3, Trash2, X, Settings2, Sparkles, RotateCcw } from 'lucide-react';
+import { getStoreItems, addStoreItem, updateStoreItem, deleteStoreItem, saveConfig } from '../utils/storage';
 
 interface StoreSectionProps {
   config: ServerConfig;
@@ -39,13 +40,10 @@ export const StoreSection: React.FC<StoreSectionProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
-  const fetchItems = async () => {
+  const fetchItems = () => {
     try {
-      const res = await fetch('/api/store');
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setStoreItems(data);
-      }
+      const data = getStoreItems();
+      setStoreItems(data);
     } catch (err) {
       console.error('Failed to load store items:', err);
     }
@@ -94,7 +92,7 @@ export const StoreSection: React.FC<StoreSectionProps> = ({
     }
   };
 
-  const handleSaveItem = async (e: React.FormEvent) => {
+  const handleSaveItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !price) {
       setFormError('Item name and price are required');
@@ -124,32 +122,19 @@ export const StoreSection: React.FC<StoreSectionProps> = ({
     };
 
     try {
-      let res;
       if (editingItem) {
-        res = await fetch(`/api/store/${editingItem.id}`, {
-          method: 'PUT',
-          headers: authHeaders,
-          body: JSON.stringify(payload),
-        });
+        updateStoreItem(editingItem.id, payload);
+        setFormSuccess('Item updated successfully!');
       } else {
-        res = await fetch('/api/store', {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify(payload),
-        });
+        addStoreItem(payload);
+        setFormSuccess('New item added to store!');
       }
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setFormSuccess(editingItem ? 'Item updated successfully!' : 'New item added to store!');
-        resetForm();
-        fetchItems();
-        setTimeout(() => setFormSuccess(null), 3000);
-      } else {
-        setFormError(data.error || 'Failed to save item. Owner authorization required.');
-      }
+      resetForm();
+      fetchItems();
+      setTimeout(() => setFormSuccess(null), 3000);
     } catch (err) {
-      setFormError('Network error connecting to backend');
+      setFormError('Failed to save store item.');
     }
   };
 
@@ -166,51 +151,32 @@ export const StoreSection: React.FC<StoreSectionProps> = ({
     setIsActive(item.active);
   };
 
-  const handleDeleteItem = async (id: string) => {
+  const handleDeleteItem = (id: string) => {
     if (!confirm('Are you sure you want to remove this item from the store?')) return;
 
     try {
-      const res = await fetch(`/api/store/${id}`, {
-        method: 'DELETE',
-        headers: authHeaders,
-      });
-      if (res.ok) {
-        fetchItems();
-      } else {
-        alert('Failed to delete item.');
-      }
+      deleteStoreItem(id);
+      fetchItems();
     } catch (err) {
       alert('Error deleting item');
     }
   };
 
-  const handleToggleItemActive = async (item: StoreItem) => {
+  const handleToggleItemActive = (item: StoreItem) => {
     try {
-      const res = await fetch(`/api/store/${item.id}`, {
-        method: 'PUT',
-        headers: authHeaders,
-        body: JSON.stringify({ active: !item.active }),
-      });
-      if (res.ok) {
-        fetchItems();
-      }
+      updateStoreItem(item.id, { active: !item.active });
+      fetchItems();
     } catch (err) {
       console.error('Failed to toggle status:', err);
     }
   };
 
-  const handleUpdateGlobalUrl = async (e: React.FormEvent) => {
+  const handleUpdateGlobalUrl = (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/config', {
-        method: 'PUT',
-        headers: authHeaders,
-        body: JSON.stringify({ webstoreUrl: globalWebstoreUrl }),
-      });
-      if (res.ok) {
-        onUpdateConfig?.({ webstoreUrl: globalWebstoreUrl });
-        alert('Server webstore URL updated successfully!');
-      }
+      saveConfig({ webstoreUrl: globalWebstoreUrl });
+      onUpdateConfig?.({ webstoreUrl: globalWebstoreUrl });
+      alert('Server webstore URL updated successfully!');
     } catch (err) {
       alert('Failed to update webstore URL');
     }
