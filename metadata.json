@@ -1,0 +1,6 @@
+{
+  "name": "NexusMC - Official Minecraft Server",
+  "description": "Official website for NexusMC Minecraft Server featuring server news, staff roster with skin head viewer, and store with in-game ranks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

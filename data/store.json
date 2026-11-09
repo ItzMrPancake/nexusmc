@@ -1,0 +1,116 @@
+[
+  {
+    "id": "item-1",
+    "name": "Nexus+ VIP Rank",
+    "category": "Ranks",
+    "price": 34.99,
+    "currency": "USD",
+    "badge": "Most Popular",
+    "summary": "The ultimate tier of membership on NexusMC with permanent global perks across all realms.",
+    "perks": [
+      "Glowing [NEXUS+] prefix in chat & tablist",
+      "Priority queue bypass during peak server hours",
+      "Access to /fly in personal claims and spawn hubs",
+      "10x Home points and 5x Vault chests",
+      "Weekly Mythic Crate Key drop",
+      "Exclusive Blue Tea particle trail and cape cosmetic",
+      "Auto-sell chest perk & 15% auction house fee discount"
+    ],
+    "icon": "Crown",
+    "webstoreUrl": "https://store.nexusmc.net/category/ranks",
+    "active": true
+  },
+  {
+    "id": "item-2",
+    "name": "MVP Rank",
+    "category": "Ranks",
+    "price": 19.99,
+    "currency": "USD",
+    "badge": "Value Choice",
+    "summary": "Elevated status with essential quality-of-life perks, custom colors, and vault space.",
+    "perks": [
+      "Bold [MVP] cyan badge prefix in chat",
+      "Access to /workbench, /anvil, and /enderchest anywhere",
+      "6x Home set points across all realms",
+      "Monthly Epic Crate Key voucher",
+      "Custom colored signs and chat formatting",
+      "Queue priority ahead of regular players"
+    ],
+    "icon": "Shield",
+    "webstoreUrl": "https://store.nexusmc.net/category/ranks",
+    "active": true
+  },
+  {
+    "id": "item-3",
+    "name": "VIP Rank",
+    "category": "Ranks",
+    "price": 9.99,
+    "currency": "USD",
+    "badge": "Starter Rank",
+    "summary": "Our gateway rank providing vital early-game commands and supporter recognition.",
+    "perks": [
+      "[VIP] green prefix in chat",
+      "3x Home set points",
+      "Access to /hat and /near commands",
+      "1x Rare Crate Key upon activation",
+      "Access to VIP-only lounge in spawn citadel"
+    ],
+    "icon": "Star",
+    "webstoreUrl": "https://store.nexusmc.net/category/ranks",
+    "active": true
+  },
+  {
+    "id": "item-4",
+    "name": "5x Celestial Crate Keys Bundle",
+    "category": "Crate Keys",
+    "price": 12.5,
+    "currency": "USD",
+    "badge": "Featured Drop",
+    "summary": "Unlock the Celestial Crate at spawn for chances at legendary armor, god tools, and rare cosmetics.",
+    "perks": [
+      "5x Celestial Keys credited to your inventory or virtual pouch",
+      "Guaranteed 1x Epic+ loot tier item per spin",
+      "Chance at exclusive Celestial Elytra cosmetic and weapon skins",
+      "Usable in Survival SMP and Custom Dungeons"
+    ],
+    "icon": "Key",
+    "webstoreUrl": "https://store.nexusmc.net/category/crates",
+    "active": true
+  },
+  {
+    "id": "item-5",
+    "name": "10x Dungeon Raid Keys",
+    "category": "Crate Keys",
+    "price": 18.0,
+    "currency": "USD",
+    "badge": "Dungeon Pack",
+    "summary": "Direct access keys to unlock high-tier mythic dungeon reward chests after slaying boss encounters.",
+    "perks": [
+      "10x Mythic Dungeon Vault Keys",
+      "Instant reward claim at Dungeon Outpost",
+      "Bonus 2x Relic Fragments per unlock",
+      "Tradeable with other players on the auction house"
+    ],
+    "icon": "Key",
+    "webstoreUrl": "https://store.nexusmc.net/category/crates",
+    "active": true
+  },
+  {
+    "id": "item-6",
+    "name": "Realm Global Booster (3 Hours)",
+    "category": "Boosters",
+    "price": 7.99,
+    "currency": "USD",
+    "badge": "Community Buff",
+    "summary": "Activate a 2x McMMO and 2x Mob XP multiplier for EVERY player currently online in your realm.",
+    "perks": [
+      "2x Skill Exp multiplier for 3 hours server-wide",
+      "Your name announced in chat and title banner across all players",
+      "Permanent Booster Champion profile badge",
+      "Stackable with personal booster tokens"
+    ],
+    "icon": "Zap",
+    "webstoreUrl": "https://store.nexusmc.net/category/boosters",
+    "active": true
+  }
+]
