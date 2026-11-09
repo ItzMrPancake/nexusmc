@@ -104,7 +104,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
             </div>
             <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400 font-mono">
               <span>Confidential Owner Access</span>
-              <span>Backend Verified</span>
+              <span className="text-teal-400/80">Direct Client Access</span>
             </div>
           </div>
 

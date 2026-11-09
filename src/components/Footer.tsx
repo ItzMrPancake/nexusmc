@@ -7,12 +7,14 @@ interface FooterProps {
   config: ServerConfig;
   setActiveTab: (tab: 'home' | 'blog' | 'staff' | 'store') => void;
   onOpenOwnerLogin: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   config,
   setActiveTab,
   onOpenOwnerLogin,
+  onOpenSettings,
 }) => {
   const { isAdmin, logout } = useAdminAuth();
   const [copied, setCopied] = useState(false);
@@ -126,15 +128,26 @@ export const Footer: React.FC<FooterProps> = ({
             <p>
               &copy; {new Date().getFullYear()} NexusMC Network. All rights reserved. Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.
             </p>
-            {/* Super small discreet owner button at bottom-left */}
-            <button
-              onClick={isAdmin ? logout : onOpenOwnerLogin}
-              className="text-[11px] text-slate-400 hover:text-teal-300 font-mono transition-colors tracking-tight select-none cursor-pointer px-2.5 py-1 rounded bg-[#07131d] border border-slate-800/80 hover:border-teal-500/40 flex items-center gap-1.5"
-              title={isAdmin ? "Owner session active (click to lock)" : "Admin Editor"}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${isAdmin ? 'bg-emerald-400' : 'bg-teal-400'}`} />
-              <span>{isAdmin ? 'admin: active (logout)' : 'admin editor'}</span>
-            </button>
+            {/* Discreet owner button at bottom-left */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={isAdmin ? logout : onOpenOwnerLogin}
+                className="text-[11px] text-slate-400 hover:text-teal-300 font-mono transition-colors tracking-tight select-none cursor-pointer px-2.5 py-1 rounded bg-[#07131d] border border-slate-800/80 hover:border-teal-500/40 flex items-center gap-1.5"
+                title={isAdmin ? "Owner session active (click to lock)" : "Admin Editor"}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${isAdmin ? 'bg-emerald-400' : 'bg-teal-400'}`} />
+                <span>{isAdmin ? 'admin: active (logout)' : 'admin editor'}</span>
+              </button>
+              {isAdmin && onOpenSettings && (
+                <button
+                  onClick={onOpenSettings}
+                  className="text-[11px] text-teal-300 hover:text-white font-mono transition-colors tracking-tight select-none cursor-pointer px-2.5 py-1 rounded bg-[#07131d] border border-teal-500/30 hover:border-teal-400 flex items-center gap-1.5"
+                  title="Configure server settings"
+                >
+                  <span>settings</span>
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-4 text-slate-400">
             <span>Java & Bedrock Compatible</span>

@@ -12,27 +12,16 @@ import { StaffSection } from './components/StaffSection';
 import { StoreSection } from './components/StoreSection';
 import { Footer } from './components/Footer';
 import { AdminLoginModal } from './components/AdminLoginModal';
+import { ServerConfigModal } from './components/ServerConfigModal';
 import { ServerConfig } from './types';
-
-const DEFAULT_CONFIG: ServerConfig = {
-  serverName: 'NexusMC',
-  tagline: 'The Premier Blue-Tea Enchanted Minecraft Network',
-  serverIp: 'nexusmc.ultramc.co',
-  bedrockPort: 22924,
-  javaPort: 22924,
-  version: 'Java & Bedrock 1.20 - 1.21.x',
-  webstoreUrl: 'https://store.nexusmc.net',
-  discordUrl: 'https://discord.gg/HFJYHcsvJy',
-  simulatedPlayers: 0,
-  maxPlayers: 20,
-  pingMs: 19,
-};
+import { getConfig, saveConfig } from './utils/storage';
 
 function MainApp() {
   const { isAdmin } = useAdminAuth();
   const [activeTab, setActiveTab] = useState<'home' | 'blog' | 'staff' | 'store'>('home');
-  const [config, setConfig] = useState<ServerConfig>(DEFAULT_CONFIG);
+  const [config, setConfig] = useState<ServerConfig>(getConfig);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
   const [loginSectionHint, setLoginSectionHint] = useState<string | undefined>(undefined);
   const [loginSuccessCallback, setLoginSuccessCallback] = useState<(() => void) | undefined>(undefined);
 
@@ -57,30 +46,25 @@ function MainApp() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Fetch server configuration
-  useEffect(() => {
-    async function loadConfig() {
-      try {
-        const res = await fetch('/api/config');
-        if (res.ok) {
-          const data = await res.json();
-          setConfig((prev) => ({ ...prev, ...data }));
-        }
-      } catch (err) {
-        console.error('Failed to load server config:', err);
-      }
-    }
-    loadConfig();
-  }, []);
-
   const handleOpenOwnerLogin = (hint?: string, onSuccess?: () => void) => {
     setLoginSectionHint(hint);
     setLoginSuccessCallback(() => onSuccess);
     setIsLoginModalOpen(true);
   };
 
+  const handleOpenSettings = () => {
+    if (!isAdmin) {
+      handleOpenOwnerLogin('Enter owner password to edit Server Network Settings', () => {
+        setIsSettingsModalOpen(true);
+      });
+    } else {
+      setIsSettingsModalOpen(true);
+    }
+  };
+
   const handleUpdateConfig = (newConfig: Partial<ServerConfig>) => {
-    setConfig((prev) => ({ ...prev, ...newConfig }));
+    const updated = saveConfig(newConfig);
+    setConfig(updated);
   };
 
   return (
@@ -90,6 +74,7 @@ function MainApp() {
         activeTab={activeTab}
         setActiveTab={handleTabChange}
         onOpenOwnerLogin={() => handleOpenOwnerLogin('Enter owner password for administrative mode')}
+        onOpenSettings={handleOpenSettings}
         serverIp={config.serverIp}
       />
 
@@ -125,6 +110,7 @@ function MainApp() {
         config={config}
         setActiveTab={handleTabChange}
         onOpenOwnerLogin={() => handleOpenOwnerLogin('Enter owner password')}
+        onOpenSettings={handleOpenSettings}
       />
 
       {/* Owner Authentication Modal */}
@@ -139,6 +125,14 @@ function MainApp() {
           setLoginSuccessCallback(undefined);
         }}
         sectionHint={loginSectionHint}
+      />
+
+      {/* Server Network Settings Modal */}
+      <ServerConfigModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        config={config}
+        onConfigUpdated={(newCfg) => setConfig(newCfg)}
       />
     </div>
   );

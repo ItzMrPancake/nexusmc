@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BlogPost } from '../types';
 import { useAdminAuth } from '../context/AdminAuthContext';
 import { Search, PlusCircle, Trash2, Edit3, Lock, ShieldCheck, Calendar, Clock, User, ArrowRight, X, Sparkles, Check, Image as ImageIcon } from 'lucide-react';
+import { getBlogPosts, addBlogPost, updateBlogPost, deleteBlogPost } from '../utils/storage';
 
 interface BlogSectionProps {
   onOpenOwnerLogin: (hint?: string) => void;
@@ -31,13 +32,10 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ onOpenOwnerLogin }) =>
   // Edit modal state
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
 
-  const fetchPosts = async () => {
+  const fetchPosts = () => {
     try {
-      const res = await fetch('/api/blog');
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setPosts(data);
-      }
+      const data = getBlogPosts();
+      setPosts(data);
     } catch (err) {
       console.error('Failed to load blog posts:', err);
     }
@@ -47,7 +45,7 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ onOpenOwnerLogin }) =>
     fetchPosts();
   }, []);
 
-  const handleCreatePost = async (e: React.FormEvent) => {
+  const handleCreatePost = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) {
       setFormError('Title and content are required');
@@ -59,73 +57,56 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ onOpenOwnerLogin }) =>
     setFormSuccess(null);
 
     try {
-      const res = await fetch('/api/blog', {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          title,
-          category,
-          author,
-          authorRole,
-          summary,
-          content,
-          coverImage,
-          featured,
-        }),
+      addBlogPost({
+        title: title.trim(),
+        category,
+        author: author.trim(),
+        authorRole: authorRole.trim(),
+        summary: summary.trim(),
+        content: content.trim(),
+        coverImage: coverImage || '/src/assets/images/blog_nexusmc_update_1794187185782.jpg',
+        readTime: `${Math.max(1, Math.ceil(content.trim().split(/\s+/).length / 150))} min read`,
+        featured,
       });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setFormSuccess('Article published successfully!');
-        setTitle('');
-        setSummary('');
-        setContent('');
-        setFeatured(false);
-        fetchPosts();
-        setTimeout(() => setFormSuccess(null), 4000);
-      } else {
-        setFormError(data.error || 'Failed to create post. Owner authorization required.');
-      }
+      setFormSuccess('Article published successfully!');
+      setTitle('');
+      setSummary('');
+      setContent('');
+      setFeatured(false);
+      fetchPosts();
+      setTimeout(() => setFormSuccess(null), 4000);
     } catch (err) {
-      setFormError('Network error while publishing post');
+      setFormError('Failed to publish post');
     } finally {
       setIsPublishing(false);
     }
   };
 
-  const handleDeletePost = async (id: string) => {
+  const handleDeletePost = (id: string) => {
     if (!confirm('Are you sure you want to delete this blog post?')) return;
 
     try {
-      const res = await fetch(`/api/blog/${id}`, {
-        method: 'DELETE',
-        headers: authHeaders,
-      });
-      if (res.ok) {
-        fetchPosts();
-      } else {
-        alert('Failed to delete post. Unauthorized.');
+      deleteBlogPost(id);
+      fetchPosts();
+      if (activeReadingPost?.id === id) {
+        setActiveReadingPost(null);
       }
     } catch (err) {
-      alert('Network error deleting post');
+      alert('Error deleting post');
     }
   };
 
-  const handleUpdatePost = async (e: React.FormEvent) => {
+  const handleUpdatePost = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPost) return;
 
     try {
-      const res = await fetch(`/api/blog/${editingPost.id}`, {
-        method: 'PUT',
-        headers: authHeaders,
-        body: JSON.stringify(editingPost),
-      });
-      if (res.ok) {
-        setEditingPost(null);
-        fetchPosts();
-      } else {
-        alert('Failed to update post. Unauthorized.');
+      updateBlogPost(editingPost.id, editingPost);
+      setEditingPost(null);
+      fetchPosts();
+      if (activeReadingPost?.id === editingPost.id) {
+        setActiveReadingPost(editingPost);
       }
     } catch (err) {
       alert('Error saving post changes');

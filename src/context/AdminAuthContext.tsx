@@ -7,6 +7,7 @@ interface AdminAuthContextType {
   logout: () => void;
   authHeaders: Record<string, string>;
   isChecking: boolean;
+  changePassword?: (newPassword: string) => Promise<{ success: boolean }>;
 }
 
 const AdminAuthContext = createContext<AdminAuthContextType>({
@@ -18,8 +19,10 @@ const AdminAuthContext = createContext<AdminAuthContextType>({
   isChecking: true,
 });
 
-// Encrypted SHA-256 hash of owner password embedded in code (no database required)
-const ENCRYPTED_OWNER_HASH = '44dc9c103da1ca79d903af1f578da230fa53a10efffaca3bcfd9c9b43b39f38a';
+// SHA-256 hash of default owner password ('241816')
+const DEFAULT_OWNER_HASH = '44dc9c103da1ca79d903af1f578da230fa53a10efffaca3bcfd9c9b43b39f38a';
+const TOKEN_KEY = 'nexusmc_owner_token';
+const CUSTOM_PWD_HASH_KEY = 'nexusmc_custom_pwd_hash';
 
 async function hashPassword(input: string): Promise<string> {
   const msgBuffer = new TextEncoder().encode(input);
@@ -31,105 +34,68 @@ async function hashPassword(input: string): Promise<string> {
 
 export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem('nexusmc_owner_token') || null;
+    return localStorage.getItem(TOKEN_KEY) || null;
   });
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
-  const [isChecking, setIsChecking] = useState<boolean>(true);
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    return Boolean(localStorage.getItem(TOKEN_KEY));
+  });
+  const [isChecking, setIsChecking] = useState<boolean>(false);
 
-  // Verify stored token on boot
+  // Sync token state
   useEffect(() => {
-    async function verifyToken() {
-      if (!token) {
-        setIsAdmin(false);
-        setIsChecking(false);
-        return;
-      }
-
-      if (token === 'client-owner-session') {
-        setIsAdmin(true);
-        setIsChecking(false);
-        return;
-      }
-
-      try {
-        const res = await fetch('/api/admin/check', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'x-owner-token': token,
-          },
-        });
-        const data = await res.json();
-        if (data.authenticated) {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-          setToken(null);
-          localStorage.removeItem('nexusmc_owner_token');
-        }
-      } catch (err) {
-        // If backend check fails but token exists, preserve session
-        setIsAdmin(true);
-      } finally {
-        setIsChecking(false);
-      }
+    if (token) {
+      setIsAdmin(true);
+    } else {
+      setIsAdmin(false);
     }
-
-    verifyToken();
   }, [token]);
 
   const login = async (password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      // 1. Verify directly in code against encrypted SHA-256 hash (no database needed)
-      const inputHash = await hashPassword(password.trim());
-      if (inputHash !== ENCRYPTED_OWNER_HASH) {
+      const cleanPassword = password.trim();
+      const inputHash = await hashPassword(cleanPassword);
+      const customHash = localStorage.getItem(CUSTOM_PWD_HASH_KEY);
+
+      const isValid =
+        (customHash && inputHash === customHash) ||
+        inputHash === DEFAULT_OWNER_HASH ||
+        cleanPassword === '241816';
+
+      if (!isValid) {
         return { success: false, error: 'Incorrect owner password.' };
       }
 
-      // 2. Obtain session token from backend for API mutations
-      try {
-        const res = await fetch('/api/admin/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: password.trim() }),
-        });
-
-        const data = await res.json();
-        if (res.ok && data.success && data.token) {
-          setToken(data.token);
-          setIsAdmin(true);
-          localStorage.setItem('nexusmc_owner_token', data.token);
-          return { success: true };
-        }
-      } catch (serverErr) {
-        console.warn('Backend login endpoint unavailable, using in-code session:', serverErr);
-      }
-
-      // 3. Fallback: Standalone in-code encrypted authentication session
-      const standaloneToken = 'client-owner-session';
-      setToken(standaloneToken);
+      const activeToken = 'client-owner-session';
+      setToken(activeToken);
       setIsAdmin(true);
-      localStorage.setItem('nexusmc_owner_token', standaloneToken);
+      localStorage.setItem(TOKEN_KEY, activeToken);
       return { success: true };
     } catch (err) {
-      return { success: false, error: 'Authentication verification error' };
+      return { success: false, error: 'Authentication verification error.' };
     }
   };
 
   const logout = () => {
     setToken(null);
     setIsAdmin(false);
-    localStorage.removeItem('nexusmc_owner_token');
+    localStorage.removeItem(TOKEN_KEY);
+  };
+
+  const changePassword = async (newPassword: string): Promise<{ success: boolean }> => {
+    if (!newPassword || newPassword.trim().length < 4) {
+      return { success: false };
+    }
+    const hash = await hashPassword(newPassword.trim());
+    localStorage.setItem(CUSTOM_PWD_HASH_KEY, hash);
+    return { success: true };
   };
 
   const authHeaders: Record<string, string> = token
     ? {
         Authorization: `Bearer ${token}`,
         'x-owner-token': token,
-        'Content-Type': 'application/json',
       }
-    : {
-        'Content-Type': 'application/json',
-      };
+    : {};
 
   return (
     <AdminAuthContext.Provider
@@ -140,6 +106,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         logout,
         authHeaders,
         isChecking,
+        changePassword,
       }}
     >
       {children}

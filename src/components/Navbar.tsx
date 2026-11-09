@@ -6,6 +6,7 @@ interface NavbarProps {
   activeTab: 'home' | 'blog' | 'staff' | 'store';
   setActiveTab: (tab: 'home' | 'blog' | 'staff' | 'store') => void;
   onOpenOwnerLogin: () => void;
+  onOpenSettings?: () => void;
   serverIp: string;
 }
 
@@ -13,6 +14,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   onOpenOwnerLogin,
+  onOpenSettings,
   serverIp,
 }) => {
   const { isAdmin, logout } = useAdminAuth();
@@ -130,9 +132,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="flex items-center gap-2 bg-[#091f2e] border border-teal-500/40 rounded-lg px-2.5 py-1.5 text-xs text-teal-300">
               <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
               <span className="text-[11px] font-mono font-medium hidden sm:inline">Owner Verified</span>
+              {onOpenSettings && (
+                <button
+                  onClick={onOpenSettings}
+                  className="text-[10px] font-mono text-teal-300 hover:text-white underline ml-1 cursor-pointer"
+                  title="Edit Server Network Settings"
+                >
+                  Settings
+                </button>
+              )}
               <button
                 onClick={logout}
-                className="text-[10px] font-mono text-slate-400 hover:text-white underline ml-1"
+                className="text-[10px] font-mono text-slate-400 hover:text-white underline ml-1 cursor-pointer"
                 title="Log out of owner controls"
               >
                 Lock
