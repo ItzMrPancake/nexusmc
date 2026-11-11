@@ -3,13 +3,15 @@ import { BlogPost } from '../types';
 import { useAdminAuth } from '../context/AdminAuthContext';
 import { Search, PlusCircle, Trash2, Edit3, Lock, ShieldCheck, Calendar, Clock, User, ArrowRight, X, Sparkles, Check, Image as ImageIcon } from 'lucide-react';
 
+import { loadBlogPosts, saveBlogPosts } from '../utils/localStore';
+
 interface BlogSectionProps {
   onOpenOwnerLogin: (hint?: string) => void;
 }
 
 export const BlogSection: React.FC<BlogSectionProps> = ({ onOpenOwnerLogin }) => {
-  const { isAdmin, authHeaders } = useAdminAuth();
-  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const { isAdmin } = useAdminAuth();
+  const [posts, setPosts] = useState<BlogPost[]>(() => loadBlogPosts());
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeReadingPost, setActiveReadingPost] = useState<BlogPost | null>(null);
@@ -31,23 +33,11 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ onOpenOwnerLogin }) =>
   // Edit modal state
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
 
-  const fetchPosts = async () => {
-    try {
-      const res = await fetch('/api/blog');
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setPosts(data);
-      }
-    } catch (err) {
-      console.error('Failed to load blog posts:', err);
-    }
-  };
-
   useEffect(() => {
-    fetchPosts();
+    setPosts(loadBlogPosts());
   }, []);
 
-  const handleCreatePost = async (e: React.FormEvent) => {
+  const handleCreatePost = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) {
       setFormError('Title and content are required');
@@ -58,78 +48,54 @@ export const BlogSection: React.FC<BlogSectionProps> = ({ onOpenOwnerLogin }) =>
     setFormError(null);
     setFormSuccess(null);
 
-    try {
-      const res = await fetch('/api/blog', {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          title,
-          category,
-          author,
-          authorRole,
-          summary,
-          content,
-          coverImage,
-          featured,
-        }),
-      });
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const words = content.trim().split(/\s+/).length;
+    const estTime = `${Math.max(1, Math.ceil(words / 150))} min read`;
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setFormSuccess('Article published successfully!');
-        setTitle('');
-        setSummary('');
-        setContent('');
-        setFeatured(false);
-        fetchPosts();
-        setTimeout(() => setFormSuccess(null), 4000);
-      } else {
-        setFormError(data.error || 'Failed to create post. Owner authorization required.');
-      }
-    } catch (err) {
-      setFormError('Network error while publishing post');
-    } finally {
-      setIsPublishing(false);
-    }
+    const newPost: BlogPost = {
+      id: `post_${Date.now()}`,
+      title: title.trim(),
+      slug: title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
+      category,
+      author: author.trim() || 'NexusMC Team',
+      authorRole: authorRole.trim() || 'Realm Master',
+      date: formattedDate,
+      readTime: estTime,
+      summary: summary.trim() || content.slice(0, 140) + '...',
+      content: content.trim(),
+      coverImage: coverImage.trim() || '/src/assets/images/blog_nexusmc_update_1794187185782.jpg',
+      featured,
+    };
+
+    const updated = [newPost, ...posts];
+    setPosts(updated);
+    saveBlogPosts(updated);
+
+    setFormSuccess('Article published and stored locally!');
+    setTitle('');
+    setSummary('');
+    setContent('');
+    setFeatured(false);
+    setIsPublishing(false);
+    setTimeout(() => setFormSuccess(null), 4000);
   };
 
-  const handleDeletePost = async (id: string) => {
+  const handleDeletePost = (id: string) => {
     if (!confirm('Are you sure you want to delete this blog post?')) return;
-
-    try {
-      const res = await fetch(`/api/blog/${id}`, {
-        method: 'DELETE',
-        headers: authHeaders,
-      });
-      if (res.ok) {
-        fetchPosts();
-      } else {
-        alert('Failed to delete post. Unauthorized.');
-      }
-    } catch (err) {
-      alert('Network error deleting post');
-    }
+    const updated = posts.filter((p) => p.id !== id);
+    setPosts(updated);
+    saveBlogPosts(updated);
   };
 
-  const handleUpdatePost = async (e: React.FormEvent) => {
+  const handleUpdatePost = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPost) return;
 
-    try {
-      const res = await fetch(`/api/blog/${editingPost.id}`, {
-        method: 'PUT',
-        headers: authHeaders,
-        body: JSON.stringify(editingPost),
-      });
-      if (res.ok) {
-        setEditingPost(null);
-        fetchPosts();
-      } else {
-        alert('Failed to update post. Unauthorized.');
-      }
-    } catch (err) {
-      alert('Error saving post changes');
-    }
+    const updated = posts.map((p) => (p.id === editingPost.id ? editingPost : p));
+    setPosts(updated);
+    saveBlogPosts(updated);
+    setEditingPost(null);
   };
 
   const categories = ['All', 'Server Update', 'Community Event', 'Announcement'];

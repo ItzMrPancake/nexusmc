@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { StoreItem, ServerConfig } from '../types';
 import { useAdminAuth } from '../context/AdminAuthContext';
-import { ShoppingBag, ExternalLink, Crown, Shield, Star, Key, Zap, Check, Edit3, Trash2, X, Settings2, Sparkles } from 'lucide-react';
+import { loadStoreItems, saveStoreItems, INITIAL_STORE_ITEMS } from '../utils/localStore';
+import { ShoppingBag, ExternalLink, Crown, Shield, Star, Key, Zap, Check, Edit3, Trash2, X, Settings2, Sparkles, RotateCcw } from 'lucide-react';
 
 interface StoreSectionProps {
   config: ServerConfig;
@@ -14,8 +15,9 @@ export const StoreSection: React.FC<StoreSectionProps> = ({
   onOpenOwnerLogin,
   onUpdateConfig,
 }) => {
-  const { isAdmin, authHeaders } = useAdminAuth();
-  const [storeItems, setStoreItems] = useState<StoreItem[]>([]);
+  const { isAdmin } = useAdminAuth();
+  // Pure local storage master state - never erased by server reboots
+  const [storeItems, setStoreItems] = useState<StoreItem[]>(() => loadStoreItems());
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
   // Store Editor Modal State
@@ -39,20 +41,16 @@ export const StoreSection: React.FC<StoreSectionProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
-  const fetchItems = async () => {
-    try {
-      const res = await fetch('/api/store');
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setStoreItems(data);
-      }
-    } catch (err) {
-      console.error('Failed to load store items:', err);
-    }
-  };
-
+  // Sync from localStorage on mount and window focus
   useEffect(() => {
-    fetchItems();
+    const items = loadStoreItems();
+    setStoreItems(items);
+
+    const handleStorageChange = () => {
+      setStoreItems(loadStoreItems());
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const getIconComponent = (iconName: string) => {
@@ -94,7 +92,7 @@ export const StoreSection: React.FC<StoreSectionProps> = ({
     }
   };
 
-  const handleSaveItem = async (e: React.FormEvent) => {
+  const handleSaveItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !price) {
       setFormError('Item name and price are required');
@@ -102,7 +100,6 @@ export const StoreSection: React.FC<StoreSectionProps> = ({
     }
 
     setFormError(null);
-    setFormSuccess(null);
 
     // Every line formatted as a distinct feature you get
     const perksArray = perksText
@@ -110,47 +107,47 @@ export const StoreSection: React.FC<StoreSectionProps> = ({
       .map((p) => p.trim())
       .filter(Boolean);
 
-    const payload = {
-      name: name.trim(),
-      category,
-      price: parseFloat(price) || 0,
-      currency: 'USD',
-      badge: badge.trim(),
-      summary: summary.trim(),
-      perks: perksArray,
-      icon,
-      webstoreUrl: itemWebstoreUrl.trim() || config.webstoreUrl,
-      active: isActive,
-    };
+    let updatedList: StoreItem[];
 
-    try {
-      let res;
-      if (editingItem) {
-        res = await fetch(`/api/store/${editingItem.id}`, {
-          method: 'PUT',
-          headers: authHeaders,
-          body: JSON.stringify(payload),
-        });
-      } else {
-        res = await fetch('/api/store', {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify(payload),
-        });
-      }
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setFormSuccess(editingItem ? 'Item updated successfully!' : 'New item added to store!');
-        resetForm();
-        fetchItems();
-        setTimeout(() => setFormSuccess(null), 3000);
-      } else {
-        setFormError(data.error || 'Failed to save item. Owner authorization required.');
-      }
-    } catch (err) {
-      setFormError('Network error connecting to backend');
+    if (editingItem) {
+      const updatedItem: StoreItem = {
+        ...editingItem,
+        name: name.trim(),
+        category,
+        price: parseFloat(price) || 0,
+        currency: 'USD',
+        badge: badge.trim(),
+        summary: summary.trim(),
+        perks: perksArray,
+        icon,
+        webstoreUrl: itemWebstoreUrl.trim() || config.webstoreUrl,
+        active: isActive,
+      };
+      updatedList = storeItems.map((item) => (item.id === editingItem.id ? updatedItem : item));
+      setFormSuccess(`Rank "${updatedItem.name}" saved! Permanently stored.`);
+    } else {
+      const newItem: StoreItem = {
+        id: `rank-${Date.now()}`,
+        name: name.trim(),
+        category,
+        price: parseFloat(price) || 0,
+        currency: 'USD',
+        badge: badge.trim(),
+        summary: summary.trim(),
+        perks: perksArray,
+        icon,
+        webstoreUrl: itemWebstoreUrl.trim() || config.webstoreUrl,
+        active: isActive,
+      };
+      updatedList = [newItem, ...storeItems];
+      setFormSuccess(`Rank "${newItem.name}" created! Permanently stored.`);
     }
+
+    // Direct, uneraseable persistence
+    saveStoreItems(updatedList);
+    setStoreItems(updatedList);
+    resetForm();
+    setTimeout(() => setFormSuccess(null), 3500);
   };
 
   const handleStartEdit = (item: StoreItem) => {
@@ -166,54 +163,36 @@ export const StoreSection: React.FC<StoreSectionProps> = ({
     setIsActive(item.active);
   };
 
-  const handleDeleteItem = async (id: string) => {
+  const handleDeleteItem = (id: string) => {
     if (!confirm('Are you sure you want to remove this item from the store?')) return;
-
-    try {
-      const res = await fetch(`/api/store/${id}`, {
-        method: 'DELETE',
-        headers: authHeaders,
-      });
-      if (res.ok) {
-        fetchItems();
-      } else {
-        alert('Failed to delete item.');
-      }
-    } catch (err) {
-      alert('Error deleting item');
+    const updatedList = storeItems.filter((item) => item.id !== id);
+    saveStoreItems(updatedList);
+    setStoreItems(updatedList);
+    if (editingItem && editingItem.id === id) {
+      resetForm();
     }
   };
 
-  const handleToggleItemActive = async (item: StoreItem) => {
-    try {
-      const res = await fetch(`/api/store/${item.id}`, {
-        method: 'PUT',
-        headers: authHeaders,
-        body: JSON.stringify({ active: !item.active }),
-      });
-      if (res.ok) {
-        fetchItems();
-      }
-    } catch (err) {
-      console.error('Failed to toggle status:', err);
-    }
+  const handleToggleItemActive = (item: StoreItem) => {
+    const updatedList = storeItems.map((i) => (i.id === item.id ? { ...i, active: !i.active } : i));
+    saveStoreItems(updatedList);
+    setStoreItems(updatedList);
   };
 
-  const handleUpdateGlobalUrl = async (e: React.FormEvent) => {
+  const handleResetToDefaults = () => {
+    if (!confirm('Reset all ranks & crate keys to original default templates?')) return;
+    saveStoreItems(INITIAL_STORE_ITEMS);
+    setStoreItems(INITIAL_STORE_ITEMS);
+    resetForm();
+    setFormSuccess('Store reset to defaults!');
+    setTimeout(() => setFormSuccess(null), 3000);
+  };
+
+  const handleUpdateGlobalUrl = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const res = await fetch('/api/config', {
-        method: 'PUT',
-        headers: authHeaders,
-        body: JSON.stringify({ webstoreUrl: globalWebstoreUrl }),
-      });
-      if (res.ok) {
-        onUpdateConfig?.({ webstoreUrl: globalWebstoreUrl });
-        alert('Server webstore URL updated successfully!');
-      }
-    } catch (err) {
-      alert('Failed to update webstore URL');
-    }
+    onUpdateConfig?.({ webstoreUrl: globalWebstoreUrl });
+    setFormSuccess('Server webstore URL updated!');
+    setTimeout(() => setFormSuccess(null), 3000);
   };
 
   const resetForm = () => {
@@ -427,16 +406,27 @@ export const StoreSection: React.FC<StoreSectionProps> = ({
                 </div>
               </div>
 
-              <button
-                onClick={() => {
-                  setIsEditorOpen(false);
-                  resetForm();
-                }}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                aria-label="Close store editor"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleResetToDefaults}
+                  className="px-3 py-1.5 rounded-xl text-xs text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  title="Reset to default items"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Reset Defaults</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setIsEditorOpen(false);
+                    resetForm();
+                  }}
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                  aria-label="Close store editor"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Body */}

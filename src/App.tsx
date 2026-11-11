@@ -13,25 +13,12 @@ import { StoreSection } from './components/StoreSection';
 import { Footer } from './components/Footer';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { ServerConfig } from './types';
-
-const DEFAULT_CONFIG: ServerConfig = {
-  serverName: 'NexusMC',
-  tagline: 'The Premier Blue-Tea Enchanted Minecraft Network',
-  serverIp: 'nexusmc.ultramc.co',
-  bedrockPort: 22924,
-  javaPort: 22924,
-  version: 'Java & Bedrock 1.20 - 1.21.x',
-  webstoreUrl: 'https://store.nexusmc.net',
-  discordUrl: 'https://discord.gg/HFJYHcsvJy',
-  simulatedPlayers: 0,
-  maxPlayers: 20,
-  pingMs: 19,
-};
+import { loadServerConfig, saveServerConfig } from './utils/localStore';
 
 function MainApp() {
   const { isAdmin } = useAdminAuth();
   const [activeTab, setActiveTab] = useState<'home' | 'blog' | 'staff' | 'store'>('home');
-  const [config, setConfig] = useState<ServerConfig>(DEFAULT_CONFIG);
+  const [config, setConfig] = useState<ServerConfig>(() => loadServerConfig());
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   const [loginSectionHint, setLoginSectionHint] = useState<string | undefined>(undefined);
   const [loginSuccessCallback, setLoginSuccessCallback] = useState<(() => void) | undefined>(undefined);
@@ -80,7 +67,11 @@ function MainApp() {
   };
 
   const handleUpdateConfig = (newConfig: Partial<ServerConfig>) => {
-    setConfig((prev) => ({ ...prev, ...newConfig }));
+    setConfig((prev) => {
+      const updated = { ...prev, ...newConfig };
+      saveServerConfig(updated);
+      return updated;
+    });
   };
 
   return (

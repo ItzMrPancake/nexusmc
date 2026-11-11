@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StaffMember } from '../types';
 import { useAdminAuth } from '../context/AdminAuthContext';
 import { extractHeadFromSkin, getMinecraftAvatarUrl } from '../utils/minecraftSkin';
+import { loadStaffMembers, saveStaffMembers, INITIAL_STAFF_MEMBERS } from '../utils/localStore';
 import { ShieldCheck, Upload, UserPlus, Edit3, Trash2, Check, AlertCircle, MessageSquare, Sparkles } from 'lucide-react';
 
 interface StaffSectionProps {
@@ -10,7 +11,7 @@ interface StaffSectionProps {
 
 export const StaffSection: React.FC<StaffSectionProps> = ({ onOpenOwnerLogin }) => {
   const { isAdmin, authHeaders } = useAdminAuth();
-  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [staffList, setStaffList] = useState<StaffMember[]>(() => loadStaffMembers());
   const [selectedTier, setSelectedTier] = useState<string>('All');
 
   // Staff creation / edit form state
@@ -37,20 +38,8 @@ export const StaffSection: React.FC<StaffSectionProps> = ({ onOpenOwnerLogin }) 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchStaff = async () => {
-    try {
-      const res = await fetch('/api/staff');
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setStaffList(data);
-      }
-    } catch (err) {
-      console.error('Failed to load staff list:', err);
-    }
-  };
-
   useEffect(() => {
-    fetchStaff();
+    setStaffList(loadStaffMembers());
   }, []);
 
   // When IGN or Name is typed, automatically update head preview without requiring file upload
@@ -159,7 +148,7 @@ export const StaffSection: React.FC<StaffSectionProps> = ({ onOpenOwnerLogin }) 
     }
   };
 
-  const handleSaveStaff = async (e: React.FormEvent) => {
+  const handleSaveStaff = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !role.trim()) {
       setFormError('Name and role are required');
@@ -167,50 +156,48 @@ export const StaffSection: React.FC<StaffSectionProps> = ({ onOpenOwnerLogin }) 
     }
 
     setFormError(null);
-    setFormSuccess(null);
 
     const targetIgn = minecraftIgn.trim() || name.trim();
     const finalAvatar = avatarUrl || getMinecraftAvatarUrl(targetIgn, 128);
 
-    const payload = {
-      name: name.trim(),
-      minecraftIgn: targetIgn,
-      role: role.trim(),
-      tier,
-      bio: bio.trim(),
-      discord: discord.trim(),
-      avatarUrl: finalAvatar,
-      skinData: extractedHeadUrl || '',
-    };
+    let updatedList: StaffMember[];
 
-    try {
-      let res;
-      if (isEditing && editingId) {
-        res = await fetch(`/api/staff/${editingId}`, {
-          method: 'PUT',
-          headers: authHeaders,
-          body: JSON.stringify(payload),
-        });
-      } else {
-        res = await fetch('/api/staff', {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify(payload),
-        });
-      }
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setFormSuccess(isEditing ? 'Staff member updated!' : 'New staff member added!');
-        resetForm();
-        fetchStaff();
-        setTimeout(() => setFormSuccess(null), 3000);
-      } else {
-        setFormError(data.error || 'Failed to save staff member.');
-      }
-    } catch (err) {
-      setFormError('Network error connecting to backend');
+    if (isEditing && editingId) {
+      const updatedMember: StaffMember = {
+        id: editingId,
+        name: name.trim(),
+        minecraftIgn: targetIgn,
+        role: role.trim(),
+        tier,
+        bio: bio.trim(),
+        joined: '2024',
+        discord: discord.trim(),
+        avatarUrl: finalAvatar,
+        skinData: extractedHeadUrl || '',
+      };
+      updatedList = staffList.map((m) => (m.id === editingId ? updatedMember : m));
+      setFormSuccess(`Staff member "${updatedMember.name}" saved! Permanently stored.`);
+    } else {
+      const newMember: StaffMember = {
+        id: `staff-${Date.now()}`,
+        name: name.trim(),
+        minecraftIgn: targetIgn,
+        role: role.trim(),
+        tier,
+        bio: bio.trim(),
+        joined: 'Just Joined',
+        discord: discord.trim(),
+        avatarUrl: finalAvatar,
+        skinData: extractedHeadUrl || '',
+      };
+      updatedList = [newMember, ...staffList];
+      setFormSuccess(`Staff member "${newMember.name}" added! Permanently stored.`);
     }
+
+    saveStaffMembers(updatedList);
+    setStaffList(updatedList);
+    resetForm();
+    setTimeout(() => setFormSuccess(null), 3500);
   };
 
   const handleStartEdit = (member: StaffMember) => {
@@ -232,21 +219,13 @@ export const StaffSection: React.FC<StaffSectionProps> = ({ onOpenOwnerLogin }) 
     });
   };
 
-  const handleDeleteStaff = async (id: string) => {
+  const handleDeleteStaff = (id: string) => {
     if (!confirm('Are you sure you want to remove this staff member?')) return;
-
-    try {
-      const res = await fetch(`/api/staff/${id}`, {
-        method: 'DELETE',
-        headers: authHeaders,
-      });
-      if (res.ok) {
-        fetchStaff();
-      } else {
-        alert('Failed to delete staff member.');
-      }
-    } catch (err) {
-      alert('Error deleting staff member');
+    const updatedList = staffList.filter((m) => m.id !== id);
+    saveStaffMembers(updatedList);
+    setStaffList(updatedList);
+    if (editingId === id) {
+      resetForm();
     }
   };
 
